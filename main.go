@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/clientcmd"
 	"log"
 	"os"
 	"time"
@@ -11,13 +12,13 @@ import (
 	corev1 "k8s.io/api/core/v1" // 导入 corev1 包
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 func main() {
 
 	// 使用 Kubernetes Pod 内的默认服务账户连接
-	config, err := rest.InClusterConfig()
+	//config, err := rest.InClusterConfig()
+	config, err := clientcmd.BuildConfigFromFlags("", "/Users/mohaijiang/.kube/config_x2")
 	if err != nil {
 		log.Fatalf("Error getting in-cluster config: %v", err)
 	}
@@ -36,6 +37,7 @@ func main() {
 
 	secretName := os.Getenv("SECRET_NAME")
 
+	fmt.Println("SECRET_NAME:", secretName)
 	// 持续监控 Secret
 	err = watchSecretChange(secretsClient, secretName, &lastResourceVersion, clientset)
 	if err != nil {
@@ -47,6 +49,10 @@ func watchSecretChange(secretsClient v1.SecretInterface, secretName string, last
 	namespace := os.Getenv("NAMESPACE")
 	deployType := os.Getenv("DEPLOY_TYPE")
 	deployName := os.Getenv("DEPLOY_NAME")
+
+	fmt.Println("namespace:", namespace)
+	fmt.Println("deployType:", deployType)
+	fmt.Println("deployName:", deployName)
 	// 使用 Watch 监视 Secret 的变化
 	watcher, err := secretsClient.Watch(context.Background(), metav1.ListOptions{
 		FieldSelector: "metadata.name=" + secretName,
@@ -97,12 +103,12 @@ func restartDeployment(clientset *kubernetes.Clientset, namespace string, deploy
 	}
 	// 修改 Deployment 的 annotation 触发重启
 	// 使用当前时间戳作为唯一值来更新 annotation
-	annotations := deployment.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
+	podAnnotations := deployment.Spec.Template.Annotations
+	if podAnnotations == nil {
+		podAnnotations = make(map[string]string)
 	}
-	annotations["secret-reload"] = time.Now().String()
-	deployment.SetAnnotations(annotations)
+	podAnnotations["secret-reload"] = time.Now().String()
+	deployment.Spec.Template.Annotations = podAnnotations
 
 	// 更新 Deployment，触发 Pod 重启
 	_, err = clientset.AppsV1().Deployments(namespace).Update(context.Background(), deployment, metav1.UpdateOptions{})
@@ -121,12 +127,12 @@ func restartStatefulset(clientset *kubernetes.Clientset, namespace, statefulSetN
 
 	// 修改 StatefulSet 的 annotation 触发重启
 	// 使用当前时间戳作为唯一值来更新 annotation
-	annotations := statefulSet.GetAnnotations()
+	annotations := statefulSet.Spec.Template.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
 	annotations["secret-reload"] = time.Now().String()
-	statefulSet.SetAnnotations(annotations)
+	statefulSet.Spec.Template.SetAnnotations(annotations)
 
 	// 更新 StatefulSet，触发 Pod 重启
 	_, err = clientset.AppsV1().StatefulSets(namespace).Update(context.Background(), statefulSet, metav1.UpdateOptions{})
