@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 	"log"
 	"os"
 	"time"
@@ -17,8 +17,8 @@ import (
 func main() {
 
 	// 使用 Kubernetes Pod 内的默认服务账户连接
-	//config, err := rest.InClusterConfig()
-	config, err := clientcmd.BuildConfigFromFlags("", "/Users/mohaijiang/.kube/config_x2")
+	config, err := rest.InClusterConfig()
+	//config, err := clientcmd.BuildConfigFromFlags("", "/Users/mohaijiang/.kube/config_x2")
 	if err != nil {
 		log.Fatalf("Error getting in-cluster config: %v", err)
 	}
